@@ -1,0 +1,1 @@
+# Patika_Hafta1_Odev
