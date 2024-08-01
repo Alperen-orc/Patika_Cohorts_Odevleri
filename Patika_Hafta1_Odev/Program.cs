@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Patika_Hafta1_Odev.Extension;
 using Patika_Hafta1_Odev.Handler;
 using Patika_Hafta1_Odev.Models;
+using Patika_Hafta1_Odev.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,11 +12,17 @@ builder.Services.AddDbContext<Context>(options => options.UseSqlServer(builder.C
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
+//Swagger implementasyonu
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddTransient<IProductService,FakeProductService>();
 
 var app = builder.Build();
 
-app.UseMiddleware<ErrorHandler>();
+//GlobalExceptionMiddleware kullanılması
+app.UseGlobalExceptionMiddleware();
+//Loglama için ReguestResponseLogging kullanılması
+app.UseRequestResponseLogging();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

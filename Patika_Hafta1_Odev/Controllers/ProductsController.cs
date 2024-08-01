@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Patika_Hafta1_Odev.Models;
+using Patika_Hafta1_Odev.Services;
 
 namespace Patika_Hafta1_Odev.Controllers
 {
@@ -9,55 +10,48 @@ namespace Patika_Hafta1_Odev.Controllers
     [ApiController]
     public class ProductsController : ControllerBase
     {
-        private readonly Context _context;
-        public ProductsController(Context context)
+        private readonly IProductService _productService;
+        public ProductsController(IProductService productService)
         {
-            _context = context;
+            _productService = productService;
         }
 
         //Tüm ürünleri listeleyen Endpoint
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>>GetProducts()
         {
-            return await _context.Products.ToListAsync();
+            return Ok(await _productService.GetProducts());
         }
         //Belirli bir ürünü getiren Endpoint
         [HttpGet("{id}")]
         public async Task<ActionResult<Product>>GetProduct(int id)
         {
-            var product = await _context.Products.FindAsync(id);
+            var product = await _productService.GetProductById(id);
             if(product == null)
             {
                 throw new KeyNotFoundException("Product Not Found");
             }
-            return product;
+            return Ok(product);
         }
 
         //Ürün ekleme Endpoint
         [HttpPost]
-        public async Task<ActionResult<Product>>PostProduct([FromBody]Product product)
+        public async Task<ActionResult<Product>>CreateProduct([FromBody]Product product)
         {
             if (!ModelState.IsValid)
             {
                 throw new ApplicationException("Invalid model state");
             }
-            _context.Products.Add(product);
-            await _context.SaveChangesAsync();
+            var createdProduct=await _productService.CreateProduct(product);
 
             //201 Http kodunun işlenmesi
-            return CreatedAtAction("GetProduct", new { id = product.Id }, new { message = "Product Created." });
+            return CreatedAtAction("GetProduct", new { id = createdProduct.Id }, new { message = "Product Created" });
         }
         //Ürün silme Endpoint
         [HttpDelete("{id}")]
         public async Task<ActionResult<Product>>DeleteProduct(int id)
         {
-            var product = await _context.Products.FindAsync(id);
-            if (product == null)
-            {
-                throw new KeyNotFoundException("Product Not Found");
-            }
-            _context.Products.Remove(product);
-            await _context.SaveChangesAsync();
+            await _productService.DeleteProduct(id);
 
             //204 Http kodunun işlenmesi
             return NoContent();
@@ -71,25 +65,9 @@ namespace Patika_Hafta1_Odev.Controllers
                 return BadRequest();
             }
 
-            _context.Entry(product).State = EntityState.Modified;
+            await _productService.UpdateProduct(product);
+            return Ok(new { Message = "Product Update" });
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!ProductExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return Ok(new { Message = "Product Updated." });
         }
         //Ürünün "name" değişkenini güncelleyen Endpoint
         [HttpPatch("{id}")]
@@ -100,7 +78,7 @@ namespace Patika_Hafta1_Odev.Controllers
                 return BadRequest("Name parameter is required.");
             }
 
-            var product = await _context.Products.FindAsync(id);
+            var product = await _productService.GetProductById(id);
             if (product == null)
             {
                 return NotFound();
@@ -115,11 +93,11 @@ namespace Patika_Hafta1_Odev.Controllers
 
             try
             {
-                await _context.SaveChangesAsync();
+                await _productService.UpdateProduct(product);
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!ProductExists(id))
+                if (id==null)
                 {
                     return NotFound();
                 }
@@ -137,30 +115,22 @@ namespace Patika_Hafta1_Odev.Controllers
         [HttpGet("list")]
         public async Task<ActionResult<IEnumerable<Product>>> ListProducts([FromQuery] string name)
         {
-            var products = from p in _context.Products
-                           select p;
-
-            if (!string.IsNullOrEmpty(name))
+            var products = await _productService.GetProducts();
+            if(string.IsNullOrEmpty(name))
             {
-                products = products.Where(p => p.Name.Contains(name));
+                products=products.Where(p=>p.Name.Contains(name));
             }
-
-            return await products.ToListAsync();
+            return Ok(products);
         }
         //Ürünün "price" değerine göre sıralama yapan Endpoint
         [HttpGet("sorted-by-price")]
         public IActionResult GetProductsSortedByPrice()
         {
             // Price'a göre sıralama yap
-            var sortedProducts = _context.Products.OrderBy(p => p.Price).ToList();
+            var sortedProducts = _productService.GetProducts().Result.OrderBy(p => p.Price);
 
             return Ok(sortedProducts);
         }
 
-        //Ürünün geçerliliğini kontrol eden fonksiyon
-        private bool ProductExists(int id)
-        {
-            return _context.Products.Any(e => e.Id == id);
-        }
     }
 }
